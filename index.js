@@ -15,10 +15,22 @@ app.get("/collection", async (req, res) => {
   try {
     browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled",
+      ],
     });
 
     const page = await browser.newPage();
+
+    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
+
+    await page.setExtraHTTPHeaders({
+      "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    });
 
     await page.setRequestInterception(true);
     page.on("request", (r) => {
@@ -43,7 +55,6 @@ app.get("/collection", async (req, res) => {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
 
-    // Debug: log what we got
     console.log("Total RSC payloads captured:", rscPayloads.length);
     rscPayloads.forEach((p, i) => console.log(`Payload ${i}:`, p.substring(0, 150)));
 

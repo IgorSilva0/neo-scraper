@@ -15,7 +15,7 @@ app.get("/collection", async (req, res) => {
   try {
   browser = await puppeteer.launch({
     headless: "new",
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/nix/var/nix/profiles/default/bin/chromium",
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
   });
 

@@ -55,6 +55,12 @@ app.get("/collection", async (req, res) => {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
 
+    // Debug: check what page we actually got
+    const pageTitle = await page.title();
+    const pageContent = await page.content();
+    console.log("Page title:", pageTitle);
+    console.log("Page content preview:", pageContent.substring(0, 300));
+
     console.log("Total RSC payloads captured:", rscPayloads.length);
     rscPayloads.forEach((p, i) => console.log(`Payload ${i}:`, p.substring(0, 150)));
 

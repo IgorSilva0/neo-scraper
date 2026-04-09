@@ -15,7 +15,7 @@ app.get("/collection", (req, res) => {
   const url = `https://www.neogames.online/character?name=${encodeURIComponent(name)}&menu=information&tab=collection`;
 
   try {
-    const result = execSync(`curl_chrome116 \
+    const result = execSync(`curl_chrome110 \
       -s \
       -X POST \
       -H "accept: text/x-component" \
@@ -25,7 +25,7 @@ app.get("/collection", (req, res) => {
       -H "origin: https://www.neogames.online" \
       -H "referer: ${url}" \
       --data-raw "[103747]" \
-      "${url}"`, 
+      "${url}"`,
       { timeout: 30000 }
     ).toString();
 
@@ -47,7 +47,10 @@ app.get("/collection", (req, res) => {
 
     const payload = parsed["1"];
     if (!payload?.data || !payload?.values) {
-      return res.status(500).json({ error: "Collection payload not found", raw: result.substring(0, 500) });
+      return res.status(500).json({ 
+        error: "Collection payload not found", 
+        raw: result.substring(0, 500) 
+      });
     }
 
     res.json(payload);

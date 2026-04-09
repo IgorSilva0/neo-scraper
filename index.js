@@ -1,6 +1,7 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require("cors");
+const { execSync } = require("child_process");
 
 const app = express();
 app.use(cors());
@@ -13,11 +14,10 @@ app.get("/collection", async (req, res) => {
 
   let browser;
   try {
-  browser = await puppeteer.launch({
-    headless: "new",
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/nix/var/nix/profiles/default/bin/chromium",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
-  });
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+    });
 
     const page = await browser.newPage();
 
@@ -44,7 +44,6 @@ app.get("/collection", async (req, res) => {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
 
-    // Poll up to 30s for payload with collection data
     let charPayload = null;
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
@@ -59,7 +58,6 @@ app.get("/collection", async (req, res) => {
       return res.status(500).json({ error: "Collection payload not found" });
     }
 
-    // Parse RSC format
     const parsed = {};
     for (const line of charPayload.split("\n")) {
       const colonIdx = line.indexOf(":");
@@ -71,7 +69,6 @@ app.get("/collection", async (req, res) => {
       } catch { /* skip */ }
     }
 
-    // Fix mojibake
     const fixEncoding = (val) => {
       if (typeof val === "string") {
         try { return decodeURIComponent(escape(val)); } catch { return val; }
@@ -89,17 +86,6 @@ app.get("/collection", async (req, res) => {
     res.status(500).json({ error: "Puppeteer failed", detail: err.message });
   } finally {
     if (browser) await browser.close();
-  }
-});
-
-const { execSync } = require("child_process");
-
-app.get("/find-chrome", (req, res) => {
-  try {
-    const result = execSync("which chromium || which chromium-browser || find /nix -name 'chromium' 2>/dev/null | head -5").toString();
-    res.json({ result });
-  } catch (e) {
-    res.json({ error: e.message });
   }
 });
 

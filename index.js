@@ -35,15 +35,6 @@ app.get("/collection", async (req, res) => {
       "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
     });
 
-    await page.setRequestInterception(true);
-    page.on("request", (r) => {
-      if (["image", "stylesheet", "font", "media"].includes(r.resourceType())) {
-        r.abort();
-      } else {
-        r.continue();
-      }
-    });
-
     const rscPayloads = [];
     page.on("response", async (response) => {
       const ct = response.headers()["content-type"] ?? "";
@@ -56,33 +47,38 @@ app.get("/collection", async (req, res) => {
       }
     });
 
+    // First load — may hit checkpoint
     await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
 
-    // Wait for security checkpoint to solve itself
-    await Promise.race([
-      page.waitForFunction(() => document.title !== "Vercel Security Checkpoint", { timeout: 15000 }),
-      new Promise(r => setTimeout(r, 15000))
-    ]);
+    let pageTitle = await page.title();
+    console.log("Page title after first load:", pageTitle);
 
-    const pageTitle = await page.title();
-    console.log("Page title after wait:", pageTitle);
-
+    // If checkpoint, wait for it to solve and reload
     if (pageTitle === "Vercel Security Checkpoint") {
-      return res.status(503).json({ error: "Bot protection could not be bypassed" });
+      console.log("Checkpoint detected, waiting for it to resolve...");
+      try {
+        await page.waitForFunction(
+          () => document.title !== "Vercel Security Checkpoint",
+          { timeout: 20000, polling: 500 }
+        );
+      } catch {
+        console.log("Checkpoint did not resolve, taking screenshot for debug...");
+        return res.status(503).json({ error: "Bot protection could not be bypassed" });
+      }
+      pageTitle = await page.title();
+      console.log("Page title after checkpoint:", pageTitle);
     }
+
+    // Wait for RSC payloads to arrive
+    console.log("Waiting for RSC payloads...");
+    await new Promise(r => setTimeout(r, 5000));
 
     console.log("Total RSC payloads captured:", rscPayloads.length);
     rscPayloads.forEach((p, i) => console.log(`Payload ${i}:`, p.substring(0, 150)));
 
-    let charPayload = null;
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-      charPayload = rscPayloads.find(t =>
-        t.includes('"tId"') && t.includes('"collections"')
-      );
-      if (charPayload) break;
-      await new Promise(r => setTimeout(r, 500));
-    }
+    let charPayload = rscPayloads.find(t =>
+      t.includes('"tId"') && t.includes('"collections"')
+    );
 
     if (!charPayload) {
       return res.status(500).json({ error: "Collection payload not found" });

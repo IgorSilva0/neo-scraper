@@ -1,6 +1,6 @@
 FROM lwthiker/curl-impersonate:0.5-chrome
 
-RUN apt-get update && apt-get install -y nodejs npm
+RUN apk add --no-cache nodejs npm
 
 WORKDIR /app
 COPY package.json .

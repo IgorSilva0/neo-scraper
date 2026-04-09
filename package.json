@@ -1,13 +1,15 @@
 {
   "name": "neo-scraper",
   "main": "index.js",
-  "scripts": { 
+  "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.0",
-    "puppeteer": "^22.0.0"
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "engines": {
     "node": "20.x"

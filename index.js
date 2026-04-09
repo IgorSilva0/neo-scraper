@@ -1,7 +1,6 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require("cors");
-const { execSync } = require("child_process");
 
 const app = express();
 app.use(cors());
@@ -44,6 +43,10 @@ app.get("/collection", async (req, res) => {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
 
+    // Debug: log what we got
+    console.log("Total RSC payloads captured:", rscPayloads.length);
+    rscPayloads.forEach((p, i) => console.log(`Payload ${i}:`, p.substring(0, 150)));
+
     let charPayload = null;
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
@@ -83,6 +86,7 @@ app.get("/collection", async (req, res) => {
     res.json(fixEncoding(parsed));
 
   } catch (err) {
+    console.error("Puppeteer error:", err.message);
     res.status(500).json({ error: "Puppeteer failed", detail: err.message });
   } finally {
     if (browser) await browser.close();

@@ -1,7 +1,9 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
+const cors = require("cors");
 
 const app = express();
+app.use(cors());
 
 app.get("/collection", async (req, res) => {
   const { name } = req.query;

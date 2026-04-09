@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["curl-impersonate-chrome"]
+
+[start]
+cmd = "node index.js"

@@ -92,4 +92,15 @@ app.get("/collection", async (req, res) => {
   }
 });
 
+const { execSync } = require("child_process");
+
+app.get("/find-chrome", (req, res) => {
+  try {
+    const result = execSync("which chromium || which chromium-browser || find /nix -name 'chromium' 2>/dev/null | head -5").toString();
+    res.json({ result });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 app.listen(process.env.PORT || 3001, () => console.log("Running"));

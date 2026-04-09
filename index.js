@@ -13,10 +13,11 @@ app.get("/collection", async (req, res) => {
 
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+  browser = await puppeteer.launch({
+    headless: "new",
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+  });
 
     const page = await browser.newPage();
 

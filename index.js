@@ -9,11 +9,36 @@ const ROUTER_STATE = "%5B%22%22%2C%7B%22children%22%3A%5B%22(routes)%22%2C%7B%22
 const ACTION_CHARACTER_LOOKUP = "00fcf30d43174133a5a6ddbee54861286a3e2ed74e";
 const ACTION_COLLECTION = "406e831520fee0850a609e6c15cb179dec2cabac57";
 
+const COOKIE_FILE = "/tmp/neo_cookies.txt";
+const COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+let lastCookieFetch = 0;
+
+function fetchCookies(name) {
+  const now = Date.now();
+  if (now - lastCookieFetch < COOKIE_MAX_AGE_MS) return; // reuse if fresh
+
+  execSync(`curl_chrome120 \
+    -s -o /dev/null \
+    -c "${COOKIE_FILE}" \
+    -H "accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+    -H "accept-language: pt-BR,pt;q=0.9,en;q=0.8" \
+    -H "origin: https://www.neogames.online" \
+    "https://www.neogames.online/character?name=${encodeURIComponent(name)}"`,
+    { timeout: 30000 }
+  );
+
+  lastCookieFetch = Date.now();
+  console.log("Cookies refreshed");
+}
+
 function curlPost(url, action, body) {
-  return execSync(`curl_chrome110 \
+  return execSync(`curl_chrome120 \
     -s \
     -X POST \
+    -b "${COOKIE_FILE}" \
+    -c "${COOKIE_FILE}" \
     -H "accept: text/x-component" \
+    -H "accept-language: pt-BR,pt;q=0.9,en;q=0.8" \
     -H "content-type: text/plain;charset=UTF-8" \
     -H "next-action: ${action}" \
     -H "next-router-state-tree: ${ROUTER_STATE}" \
@@ -43,9 +68,10 @@ app.get("/collection", async (req, res) => {
   if (!name) return res.status(400).json({ error: "Missing name" });
 
   try {
+    fetchCookies(name);
+
     const baseUrl = `https://www.neogames.online/character?name=${encodeURIComponent(name)}&menu=information&tab=collection`;
 
-    // Step 1: get character ID from name
     const lookupResult = curlPost(
       `https://www.neogames.online/character?name=${encodeURIComponent(name)}`,
       ACTION_CHARACTER_LOOKUP,
@@ -55,6 +81,7 @@ app.get("/collection", async (req, res) => {
     console.log("Lookup response:", lookupResult.substring(0, 200));
 
     if (lookupResult.includes("Vercel Security Checkpoint")) {
+      lastCookieFetch = 0; // force cookie refresh next time
       return res.status(503).json({ error: "Bot protection triggered" });
     }
 
@@ -67,7 +94,6 @@ app.get("/collection", async (req, res) => {
 
     console.log("Found characterIdx:", characterIdx);
 
-    // Step 2: fetch collection using character ID
     const collectionResult = curlPost(
       baseUrl,
       ACTION_COLLECTION,
@@ -77,6 +103,7 @@ app.get("/collection", async (req, res) => {
     console.log("Collection response:", collectionResult.substring(0, 200));
 
     if (collectionResult.includes("Vercel Security Checkpoint")) {
+      lastCookieFetch = 0;
       return res.status(503).json({ error: "Bot protection triggered" });
     }
 
@@ -88,6 +115,55 @@ app.get("/collection", async (req, res) => {
     }
 
     res.json(payload);
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/character", async (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: "Missing name" });
+
+  try {
+    fetchCookies(name);
+
+    const lookupResult = curlPost(
+      `https://www.neogames.online/character?name=${encodeURIComponent(name)}`,
+      ACTION_CHARACTER_LOOKUP,
+      `["${name}"]`
+    );
+
+    console.log("Lookup response:", lookupResult.substring(0, 200));
+
+    if (lookupResult.includes("Vercel Security Checkpoint")) {
+      lastCookieFetch = 0;
+      return res.status(503).json({ error: "Bot protection triggered" });
+    }
+
+    const lookupParsed = parseFlightResponse(lookupResult);
+    const character = lookupParsed["1"]?.character;
+    const characterIdx = character?.characterIdx;
+
+    if (!characterIdx) {
+      return res.status(404).json({ error: "Character not found", raw: lookupResult.substring(0, 300) });
+    }
+
+    const baseUrl = `https://www.neogames.online/character?name=${encodeURIComponent(name)}&menu=information&tab=collection&subtab=0`;
+    const collectionResult = curlPost(baseUrl, ACTION_COLLECTION, `[${characterIdx}]`);
+
+    console.log("Collection response:", collectionResult.substring(0, 200));
+
+    if (collectionResult.includes("Vercel Security Checkpoint")) {
+      lastCookieFetch = 0;
+      return res.status(503).json({ error: "Bot protection triggered" });
+    }
+
+    const collectionParsed = parseFlightResponse(collectionResult);
+    const collection = collectionParsed["1"];
+
+    res.json({ character, collection });
 
   } catch (err) {
     console.error(err.message);

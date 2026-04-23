@@ -15,9 +15,9 @@ let lastCookieFetch = 0;
 
 function fetchCookies(name) {
   const now = Date.now();
-  if (now - lastCookieFetch < COOKIE_MAX_AGE_MS) return; // reuse if fresh
+  if (now - lastCookieFetch < COOKIE_MAX_AGE_MS) return;
 
-  execSync(`curl_chrome116 \
+  execSync(`curl_chrome110 \
     -s -o /dev/null \
     -c "${COOKIE_FILE}" \
     -H "accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
@@ -32,7 +32,7 @@ function fetchCookies(name) {
 }
 
 function curlPost(url, action, body) {
-  return execSync(`curl_chrome116 \
+  return execSync(`curl_chrome110 \
     -s \
     -X POST \
     -b "${COOKIE_FILE}" \

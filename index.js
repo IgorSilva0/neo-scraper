@@ -155,9 +155,9 @@ app.get("/character", async (req, res) => {
 
     console.log("Collection response:", collectionResult.substring(0, 200));
 
-    if (collectionResult.includes("Vercel Security Checkpoint")) {
+    if (lookupResult.includes("Vercel Security Checkpoint")) {
       lastCookieFetch = 0;
-      return res.status(503).json({ error: "Bot protection triggered" });
+      return res.status(503).json({ error: "Bot protection triggered", raw: lookupResult.substring(0, 500) });
     }
 
     const collectionParsed = parseFlightResponse(collectionResult);

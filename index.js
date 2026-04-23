@@ -32,7 +32,7 @@ function fetchCookies(name) {
 }
 
 function curlPost(url, action, body) {
-  return execSync(`curl_chrome120 \
+  return execSync(`curl_chrome116 \
     -s \
     -X POST \
     -b "${COOKIE_FILE}" \

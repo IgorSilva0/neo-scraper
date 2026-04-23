@@ -17,7 +17,7 @@ function fetchCookies(name) {
   const now = Date.now();
   if (now - lastCookieFetch < COOKIE_MAX_AGE_MS) return; // reuse if fresh
 
-  execSync(`curl_chrome120 \
+  execSync(`curl_chrome116 \
     -s -o /dev/null \
     -c "${COOKIE_FILE}" \
     -H "accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \

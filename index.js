@@ -150,7 +150,7 @@ app.get("/character", async (req, res) => {
       return res.status(404).json({ error: "Character not found", raw: lookupResult.substring(0, 300) });
     }
 
-    const baseUrl = `https://www.neogames.online/character?name=${encodeURIComponent(name)}&menu=information&tab=collection&subtab=0`;
+    const baseUrl = `https://www.neogames.online/character?name=${encodeURIComponent(name)}&menu=information&tab=collection`;
     const collectionResult = curlPost(baseUrl, ACTION_COLLECTION, `[${characterIdx}]`);
 
     console.log("Collection response:", collectionResult.substring(0, 200));

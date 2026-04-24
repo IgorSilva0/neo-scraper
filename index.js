@@ -42,30 +42,8 @@ async function refreshSession() {
 
   sessionPage = await b.newPage();
 
-  // Hide webdriver
   await sessionPage.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-  });
-
-  // Intercept JS to extract action hashes
-  const foundHashes = [];
-  sessionPage.on("response", async (response) => {
-    const url = response.url();
-    if (!url.endsWith(".js") && !url.includes(".js?")) return;
-    try {
-      const text = await response.text();
-      // Try both 40-char and 42-char hex hashes starting with "40"
-      const matches = text.match(/["']40[a-f0-9]{38,42}["']/g);
-      if (matches) {
-        matches.forEach(m => {
-          const hash = m.replace(/["']/g, "");
-          if (!foundHashes.includes(hash)) {
-            foundHashes.push(hash);
-            console.log("Found action hash:", hash);
-          }
-        });
-      }
-    } catch {}
   });
 
   await sessionPage.goto("https://www.neogames.online/character?name=Pardal", {
@@ -73,8 +51,13 @@ async function refreshSession() {
     timeout: 60000,
   });
 
-  // Wait for JS challenge to complete
   await new Promise(r => setTimeout(r, 5000));
+
+  // Log page title and first 500 chars of content
+  const title = await sessionPage.title();
+  const content = await sessionPage.content();
+  console.log("Page title:", title);
+  console.log("Page content (first 500):", content.substring(0, 500));
 
   sessionCookies = await sessionPage.cookies();
   console.log("Session cookies:", sessionCookies.map(c => c.name));

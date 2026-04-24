@@ -9,6 +9,7 @@ app.use(cors());
 const ROUTER_STATE = "%5B%22%22%2C%7B%22children%22%3A%5B%22(routes)%22%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22(marketing)%22%2C%7B%22children%22%3A%5B%22character%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C16%5D";
 const ACTION_CHARACTER_LOOKUP = "00fcf30d43174133a5a6ddbee54861286a3e2ed74e";
 const ACTION_COLLECTION = "407bef0dee1a39dbce9ec70727e07bb14c14d97d15";
+const DEPLOYMENT_ID = "dpl_EJWadjubi3ZiyVLtxwUqYDKKyRjz";
 
 const COOKIE_FILE = "/tmp/neo_cookies.txt";
 const COOKIE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -61,6 +62,7 @@ function curlPost(url, action, body) {
     -H "content-type: text/plain;charset=UTF-8" \
     -H "next-action: ${action}" \
     -H "next-router-state-tree: ${ROUTER_STATE}" \
+    -H "x-deployment-id: ${DEPLOYMENT_ID}" \
     -H "origin: https://www.neogames.online" \
     -H "referer: https://www.neogames.online/character" \
     --data-raw '${body}' \

@@ -8,7 +8,11 @@ app.use(cors());
 const ROUTER_STATE = decodeURIComponent("%5B%22%22%2C%7B%22children%22%3A%5B%22(routes)%22%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22(marketing)%22%2C%7B%22children%22%3A%5B%22character%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C0%5D%7D%2Cnull%2Cnull%2C16%5D");
 
 let browser = null;
-let pagePool = null;
+let sessionPage = null;
+let sessionCookies = null;
+let sessionHashes = null;
+let lastSessionRefresh = 0;
+const SESSION_MAX_AGE_MS = 8 * 60 * 1000;
 
 async function getBrowser() {
   if (!browser || !browser.connected) {
@@ -21,18 +25,12 @@ async function getBrowser() {
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
+        "--disable-blink-features=AutomationControlled",
       ],
     });
   }
   return browser;
 }
-
-// Reusable page with valid Vercel session — refreshed every 8 minutes
-let sessionPage = null;
-let sessionCookies = null;
-let sessionHashes = null;
-let lastSessionRefresh = 0;
-const SESSION_MAX_AGE_MS = 8 * 60 * 1000;
 
 async function refreshSession() {
   console.log("Refreshing session...");
@@ -44,6 +42,11 @@ async function refreshSession() {
 
   sessionPage = await b.newPage();
 
+  // Hide webdriver
+  await sessionPage.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+  });
+
   // Intercept JS to extract action hashes
   const foundHashes = [];
   sessionPage.on("response", async (response) => {
@@ -51,7 +54,8 @@ async function refreshSession() {
     if (!url.endsWith(".js") && !url.includes(".js?")) return;
     try {
       const text = await response.text();
-      const matches = text.match(/["']40[a-f0-9]{40}["']/g);
+      // Try both 40-char and 42-char hex hashes starting with "40"
+      const matches = text.match(/["']40[a-f0-9]{38,42}["']/g);
       if (matches) {
         matches.forEach(m => {
           const hash = m.replace(/["']/g, "");
@@ -69,15 +73,65 @@ async function refreshSession() {
     timeout: 60000,
   });
 
-  // Wait a bit for JS challenge to complete
-  await new Promise(r => setTimeout(r, 3000));
+  // Wait for JS challenge to complete
+  await new Promise(r => setTimeout(r, 5000));
 
   sessionCookies = await sessionPage.cookies();
   console.log("Session cookies:", sessionCookies.map(c => c.name));
   console.log("All found hashes:", foundHashes);
 
-  // Assign hashes — first is lookup, second is collection (by order of appearance)
-  sessionHashes = foundHashes;
+  // Also try extracting hashes from page source directly
+  if (foundHashes.length < 2) {
+    console.log("Trying to extract hashes from page source...");
+    try {
+      const pageContent = await sessionPage.content();
+      const matches = pageContent.match(/["']40[a-f0-9]{38,42}["']/g);
+      if (matches) {
+        matches.forEach(m => {
+          const hash = m.replace(/["']/g, "");
+          if (!foundHashes.includes(hash)) {
+            foundHashes.push(hash);
+            console.log("Found hash in page source:", hash);
+          }
+        });
+      }
+    } catch (e) {
+      console.log("Page source extraction failed:", e.message);
+    }
+  }
+
+  // Also intercept network requests to capture next-action headers from actual XHR
+  console.log("Triggering collection tab to capture hashes from live requests...");
+  const capturedActions = [];
+  sessionPage.on("request", (request) => {
+    const action = request.headers()["next-action"];
+    if (action && !capturedActions.includes(action)) {
+      capturedActions.push(action);
+      console.log("Captured next-action from request:", action);
+    }
+  });
+
+  // Navigate to collection tab to trigger both actions
+  try {
+    await sessionPage.goto(
+      "https://www.neogames.online/character?name=Pardal&menu=information&tab=collection&subtab=0",
+      { waitUntil: "networkidle2", timeout: 30000 }
+    );
+    await new Promise(r => setTimeout(r, 3000));
+  } catch {}
+
+  console.log("Captured actions from requests:", capturedActions);
+
+  // Prefer captured actions from live requests (most reliable)
+  if (capturedActions.length >= 2) {
+    sessionHashes = capturedActions;
+  } else if (capturedActions.length > 0) {
+    sessionHashes = [...capturedActions, ...foundHashes.filter(h => !capturedActions.includes(h))];
+  } else {
+    sessionHashes = foundHashes;
+  }
+
+  console.log("Final hashes:", sessionHashes);
   lastSessionRefresh = Date.now();
 }
 
@@ -94,6 +148,10 @@ async function serverAction(url, action, body) {
   const page = await b.newPage();
 
   try {
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    });
+
     await page.setCookie(...cookies);
 
     const result = await page.evaluate(async ({ url, action, body, ROUTER_STATE }) => {
@@ -131,6 +189,25 @@ function parseFlightResponse(text) {
   }
   return parsed;
 }
+
+app.get("/debug", async (req, res) => {
+  const { hashes, cookies } = await getSession();
+  res.json({
+    hashes,
+    cookieNames: cookies ? cookies.map(c => c.name) : [],
+    lastRefresh: new Date(lastSessionRefresh).toISOString(),
+  });
+});
+
+app.get("/debug/refresh", async (req, res) => {
+  lastSessionRefresh = 0;
+  await refreshSession();
+  const { hashes, cookies } = await getSession();
+  res.json({
+    hashes,
+    cookieNames: cookies ? cookies.map(c => c.name) : [],
+  });
+});
 
 app.get("/character", async (req, res) => {
   const { name } = req.query;
